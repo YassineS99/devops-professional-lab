@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+__pycache__
+*.pyc
+.env
+docs
+tests
+compose
+Dockerfile*
+README.md
