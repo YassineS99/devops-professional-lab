@@ -1,18 +1,19 @@
 == baseline
-baseline               GET / 200/0.003294s | GET /ready 200/0.004199s | POST 200/0.005057s
-redis=running/healthy 
+baseline               GET / 200/0.005054s | GET /ready 200/0.004445s | POST 200/0.004616s
+redis=running/healthy vote=running/healthy 
 == 1. redis stopped
-redis stopped          GET / 200/0.001366s | GET /ready 200/0.004433s | POST 200/0.004861s
-
-after start            GET / 200/0.001484s | GET /ready 200/0.003370s | POST 200/0.006128s
-redis=running/healthy 
+redis stopped          GET / 200/0.001398s | GET /ready 503/2.001966s | POST 503/3.002537s
+vote=running/unhealthy 
+after start            GET / 200/0.004289s | GET /ready 200/0.004392s | POST 200/0.007096s
+redis=running/healthy vote=running/healthy 
 == 2. redis paused (hung)
-redis paused           GET / 200/0.001393s | GET /ready 200/0.003680s | POST 200/0.004125s
-redis=paused/ 
-after unpause          GET / 200/0.006434s | GET /ready 200/0.004333s | POST 200/0.008129s
-redis=running/healthy 
+redis paused           GET / 200/0.001289s | GET /ready 503/1.004299s | POST 503/1.005330s
+redis=paused/ vote=running/unhealthy 
+after unpause          GET / 200/0.001602s | GET /ready 200/0.003408s | POST 200/0.006520s
+redis=running/healthy vote=running/healthy 
 == 3. redis cut off from the network
-redis disconnected     GET / 200/0.001343s | GET /ready 200/0.004764s | POST 200/0.004444s
-redis=running/healthy 
-after reconnect        GET / 200/0.001346s | GET /ready 200/0.003303s | POST 200/0.005580s
-redis=running/healthy 
+redis disconnected     GET / 200/0.001338s | GET /ready 503/2.001644s | POST 503/3.002528s
+redis=running/healthy vote=running/unhealthy 
+after reconnect        GET / 200/0.001636s | GET /ready 200/0.003920s | POST 200/0.005905s
+redis=running/healthy vote=running/healthy 
+RESULT: all three breaks took effect
