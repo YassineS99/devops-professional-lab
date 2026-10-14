@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Keeps the pinned commit SHAs in workflows current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 14
+
+  # Keeps the base image tag and digest in the Dockerfile current.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 14
+
+  # Keeps the pinned Python dependencies current.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 14
