@@ -32,7 +32,7 @@ jobs:
 
       # The SBOM is generated first so it exists even if the scan fails.
       - name: Generate SBOM (CycloneDX)
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: vote:scan
           version: v0.69.3
@@ -42,7 +42,7 @@ jobs:
       # Gate: fail on HIGH/CRITICAL findings that have a fix available.
       # Unfixed base-image findings are tracked in docs, not blocked on.
       - name: Scan image
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: vote:scan
           version: v0.69.3
