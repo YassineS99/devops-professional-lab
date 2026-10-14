@@ -1,0 +1,45 @@
+name: vote-release
+
+services:
+  vote:
+    image: ${VOTE_IMAGE:?set VOTE_IMAGE to an image reference}
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8000"
+    networks:
+      - front
+      - back
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/ready', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 2
+      start_period: 5s
+    restart: unless-stopped
+    mem_limit: 256m
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks:
+      - back
+    restart: unless-stopped
+    mem_limit: 128m
+
+networks:
+  front:
+  back:
+    internal: true
+
+volumes:
+  redis-data:

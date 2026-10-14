@@ -1,0 +1,136 @@
+
+==== 1. baseline: the known-good release
+$ docker compose -f compose/docker-compose.release.yml up -d --wait --wait-timeout 60
+ Container vote-release-vote-1 Running 
+ Container vote-release-redis-1 Running 
+ Container vote-release-redis-1 Waiting 
+ Container vote-release-redis-1 Healthy 
+ Container vote-release-redis-1 Waiting 
+ Container vote-release-vote-1 Waiting 
+ Container vote-release-vote-1 Healthy 
+ Container vote-release-redis-1 Healthy 
+[exit code 0]
+previous known-good reference: localhost:5000/vote@sha256:52726dde5a356750b6caa13803b3a47dd8d9ad3d38c6b7f61845d027c606efed
+$ curl -s -o /dev/null -w ready http=%{http_code}\n http://localhost:8080/ready
+ready http=200
+[exit code 0]
+$ curl -s -o /dev/null -w vote http=%{http_code}\n -X POST -d vote=a http://localhost:8080/
+vote http=200
+[exit code 0]
+votes in redis before the release: 1
+
+==== 2. deploy the bad release
+$ docker compose -f compose/docker-compose.release.yml up -d --wait --wait-timeout 40
+ Container vote-release-redis-1 Running 
+ Container vote-release-vote-1 Recreate 
+ Container vote-release-vote-1 Recreated 
+ Container vote-release-redis-1 Waiting 
+ Container vote-release-redis-1 Healthy 
+ Container vote-release-vote-1 Starting 
+ Container vote-release-vote-1 Started 
+ Container vote-release-redis-1 Waiting 
+ Container vote-release-vote-1 Waiting 
+ Container vote-release-redis-1 Healthy 
+container vote-release-vote-1 is unhealthy
+[exit code 1]
+bad release rejected by the health gate after 4s
+deploy exit code: 1 (non-zero means the gate rejected it)
+
+==== 3. evidence: what the orchestrator sees
+$ docker compose -f compose/docker-compose.release.yml ps -a
+NAME                   IMAGE                                                                                         COMMAND                  SERVICE   CREATED         STATUS                                  PORTS
+vote-release-redis-1   redis:7-alpine                                                                                "docker-entrypoint.s…"   redis     10 hours ago    Up 10 hours (healthy)                   6379/tcp
+vote-release-vote-1    localhost:5000/vote@sha256:b256365afffcb0646bbb976ff15ce8c75fb4b9cdeaed69246827267269b05089   "gunicorn app:app -b…"   vote      4 seconds ago   Restarting (1) Less than a second ago   
+[exit code 0]
+$ docker inspect vote-release-vote-1 --format state={{.State.Status}} exit_code={{.State.ExitCode}} restarts={{.RestartCount}}
+state=running exit_code=0 restarts=2
+[exit code 0]
+$ docker inspect vote-release-vote-1 --format health={{.State.Health.Status}}
+health=starting
+[exit code 0]
+$ docker inspect vote-release-vote-1 --format image={{.Config.Image}}
+image=localhost:5000/vote@sha256:b256365afffcb0646bbb976ff15ce8c75fb4b9cdeaed69246827267269b05089
+[exit code 0]
+$ docker inspect vote-release-vote-1 --format commit={{index .Config.Labels "org.opencontainers.image.revision"}}
+commit=bad-demo-3c029cc
+[exit code 0]
+$ curl -s -o /dev/null --max-time 5 -w user traffic http=%{http_code}\n http://localhost:8080/
+user traffic http=000
+[exit code 56]
+
+==== 4. evidence: why it failed, from before any user traffic
+$ docker compose -f compose/docker-compose.release.yml logs --no-color --tail 30 vote
+vote-1  |     self.wsgi = self.app.wsgi()
+vote-1  |                 ^^^^^^^^^^^^^^^
+vote-1  |   File "/usr/local/lib/python3.11/site-packages/gunicorn/app/base.py", line 66, in wsgi
+vote-1  |     self.callable = self.load()
+vote-1  |                     ^^^^^^^^^^^
+vote-1  |   File "/usr/local/lib/python3.11/site-packages/gunicorn/app/wsgiapp.py", line 57, in load
+vote-1  |     return self.load_wsgiapp()
+vote-1  |            ^^^^^^^^^^^^^^^^^^^
+vote-1  |   File "/usr/local/lib/python3.11/site-packages/gunicorn/app/wsgiapp.py", line 47, in load_wsgiapp
+vote-1  |     return util.import_app(self.app_uri)
+vote-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+vote-1  |   File "/usr/local/lib/python3.11/site-packages/gunicorn/util.py", line 420, in import_app
+vote-1  |     mod = importlib.import_module(module)
+vote-1  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+vote-1  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+vote-1  |     return _bootstrap._gcd_import(name[level:], package, level)
+vote-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+vote-1  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+vote-1  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+vote-1  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+vote-1  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+vote-1  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+vote-1  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+vote-1  |   File "/app/app.py", line 4, in <module>
+vote-1  |     REQUIRED = os.environ["REDIS_URL"]   # not set here, so this raises KeyError
+vote-1  |                ~~~~~~~~~~^^^^^^^^^^^^^
+vote-1  |   File "<frozen os>", line 679, in __getitem__
+vote-1  | KeyError: 'REDIS_URL'
+vote-1  | 'REDIS_URL'
+vote-1  | [2026-10-14 21:35:41 +0000] [7] [INFO] Worker exiting (pid: 7)
+[exit code 0]
+
+==== 5. rollback to the previous known-good reference
+$ docker compose -f compose/docker-compose.release.yml up -d --wait --wait-timeout 60
+ Container vote-release-redis-1 Running 
+ Container vote-release-vote-1 Recreate 
+ Container vote-release-vote-1 Recreated 
+ Container vote-release-redis-1 Waiting 
+ Container vote-release-redis-1 Healthy 
+ Container vote-release-vote-1 Starting 
+ Container vote-release-vote-1 Started 
+ Container vote-release-redis-1 Waiting 
+ Container vote-release-vote-1 Waiting 
+ Container vote-release-redis-1 Healthy 
+ Container vote-release-vote-1 Healthy 
+[exit code 0]
+rollback finished in 7s
+
+==== 6. verify recovery
+$ docker compose -f compose/docker-compose.release.yml ps -a
+NAME                   IMAGE                                                                                         COMMAND                  SERVICE   CREATED         STATUS                   PORTS
+vote-release-redis-1   redis:7-alpine                                                                                "docker-entrypoint.s…"   redis     10 hours ago    Up 10 hours (healthy)    6379/tcp
+vote-release-vote-1    localhost:5000/vote@sha256:52726dde5a356750b6caa13803b3a47dd8d9ad3d38c6b7f61845d027c606efed   "gunicorn app:app -b…"   vote      6 seconds ago   Up 5 seconds (healthy)   0.0.0.0:8080->8000/tcp, [::]:8080->8000/tcp
+[exit code 0]
+$ curl -s -w  http=%{http_code}\n http://localhost:8080/ready
+ready
+ http=200
+[exit code 0]
+$ curl -s -o /dev/null -w vote http=%{http_code}\n -X POST -d vote=a http://localhost:8080/
+vote http=200
+[exit code 0]
+votes in redis: before=1 after=2 (one new vote was added)
+$ docker ps -a --filter name=vote-release --format {{.Names}} {{.Status}}
+vote-release-vote-1 Up 6 seconds (healthy)
+vote-release-redis-1 Up 10 hours (healthy)
+[exit code 0]
+running image: localhost:5000/vote@sha256:52726dde5a356750b6caa13803b3a47dd8d9ad3d38c6b7f61845d027c606efed
+
+==== 7. result
+PASS bad release was rejected
+PASS rollback succeeded
+PASS /ready is 200 after rollback
+PASS running the previous digest
+PASS no votes lost
