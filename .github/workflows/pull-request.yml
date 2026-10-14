@@ -19,22 +19,49 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+    env:
+      COMPOSE: docker compose -f compose/docker-compose.yml
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Build image
-        run: docker build -t vote:ci .
+      - name: Start the stack and wait until healthy
+        run: $COMPOSE up -d --build --wait --wait-timeout 90
 
-      - name: Start container
-        run: docker run -d --name vote-ci -p 8080:8000 vote:ci
+      - name: Smoke test readiness
+        run: bash tests/reliable-smoke-test.sh http://localhost:8080/ready
 
-      - name: Smoke test
-        run: bash tests/reliable-smoke-test.sh http://localhost:8080/ vote-ci
+      - name: Vote round trip
+        run: |
+          curl -fsS -o /dev/null -X POST -d vote=a http://localhost:8080/
+          votes=$($COMPOSE exec -T redis redis-cli llen votes | tr -d '\r\n ')
+          echo "votes in redis: $votes"
+          test "$votes" = "1"
 
-      - name: Upload smoke-test logs
+      - name: Failure check, readiness must fail when Redis is down
+        run: |
+          $COMPOSE stop redis
+          set +e
+          MAX_TOTAL=20 bash tests/reliable-smoke-test.sh http://localhost:8080/ready
+          rc=$?
+          set -e
+          echo "smoke test exit code with Redis down: $rc"
+          test "$rc" -eq 11
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p smoke-artifacts
+          $COMPOSE logs --no-color > smoke-artifacts/compose.log 2>&1 || true
+          $COMPOSE ps -a > smoke-artifacts/compose-ps.txt 2>&1 || true
+
+      - name: Tear down
+        if: always()
+        run: $COMPOSE down -v
+
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
