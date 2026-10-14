@@ -1,0 +1,61 @@
+name: Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"   # weekly: new CVEs appear without any code change
+
+# Deny everything by default. Each job asks for exactly what it needs.
+permissions: {}
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image-scan-and-sbom:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build -t vote:scan .
+
+      # The SBOM is generated first so it exists even if the scan fails.
+      - name: Generate SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          image-ref: vote:scan
+          version: v0.69.3
+          format: cyclonedx
+          output: sbom.cdx.json
+
+      # Gate: fail on HIGH/CRITICAL findings that have a fix available.
+      # Unfixed base-image findings are tracked in docs, not blocked on.
+      - name: Scan image
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        with:
+          image-ref: vote:scan
+          version: v0.69.3
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          retention-days: 30
+          if-no-files-found: ignore
