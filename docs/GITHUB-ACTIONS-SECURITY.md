@@ -87,7 +87,7 @@ Result: OS packages (Debian 13.7, 87 packages) 0 findings, and all 10 Python pac
 
 Why this differs from Docker Scout: Scout reported 1 HIGH (zlib) and 1 MEDIUM (tar) in the base image. Both have no upstream fix, so the gate ignores them on purpose. They are documented in DOCKER-BEST-PRACTICES.md and the weekly scheduled run will catch them once a fix exists.
 
-SBOM: CycloneDX JSON, uploaded as the `sbom` artifact (about 11 KB, kept 30 days). It lists every package in the image, so a newly disclosed CVE can be checked against it without rebuilding anything.
+SBOM: CycloneDX JSON, uploaded as the `sbom` artifact (about 190 KB of JSON, 11 KB zipped, kept 30 days). It lists every package in the image, so a newly disclosed CVE can be checked against it without rebuilding anything. A copy is in docs/evidence/sbom.
 
 ## 8. Research notes
 
