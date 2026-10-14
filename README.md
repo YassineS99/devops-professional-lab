@@ -82,3 +82,10 @@ its steps are in section E of `docs/DEPLOYMENT-AND-ROLLBACK.md`.
 - Registry, digest and promotion steps are manual and not part of CI.
 
 Each document ends with its own limitations section.
+
+## Evidence
+
+- `docs/evidence/smoke-scenarios.log`: the five smoke test scenarios
+- `docs/evidence/compose-failure-drill.log`: Redis broken three ways
+- `docs/evidence/release-drill.log`: bad release and rollback
+- `docs/evidence/sbom/sbom.cdx.json`: CycloneDX SBOM of the image

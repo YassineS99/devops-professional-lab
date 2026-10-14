@@ -1,0 +1,18 @@
+== baseline
+baseline               GET / 200/0.003294s | GET /ready 200/0.004199s | POST 200/0.005057s
+redis=running/healthy 
+== 1. redis stopped
+redis stopped          GET / 200/0.001366s | GET /ready 200/0.004433s | POST 200/0.004861s
+
+after start            GET / 200/0.001484s | GET /ready 200/0.003370s | POST 200/0.006128s
+redis=running/healthy 
+== 2. redis paused (hung)
+redis paused           GET / 200/0.001393s | GET /ready 200/0.003680s | POST 200/0.004125s
+redis=paused/ 
+after unpause          GET / 200/0.006434s | GET /ready 200/0.004333s | POST 200/0.008129s
+redis=running/healthy 
+== 3. redis cut off from the network
+redis disconnected     GET / 200/0.001343s | GET /ready 200/0.004764s | POST 200/0.004444s
+redis=running/healthy 
+after reconnect        GET / 200/0.001346s | GET /ready 200/0.003303s | POST 200/0.005580s
+redis=running/healthy 
