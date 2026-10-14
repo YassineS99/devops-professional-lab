@@ -1,0 +1,44 @@
+name: Pull Request
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# Deny everything by default. Each job asks for exactly what it needs.
+permissions: {}
+
+# A new push cancels the older run for the same PR.
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Build image
+        run: docker build -t vote:ci .
+
+      - name: Start container
+        run: docker run -d --name vote-ci -p 8080:8000 vote:ci
+
+      - name: Smoke test
+        run: bash tests/reliable-smoke-test.sh http://localhost:8080/ vote-ci
+
+      - name: Upload smoke-test logs
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: smoke-artifacts
+          path: smoke-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
