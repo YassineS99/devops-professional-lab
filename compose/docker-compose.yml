@@ -1,0 +1,48 @@
+name: vote-lab
+
+services:
+  vote:
+    build:
+      context: ..
+    image: vote:compose
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8000"          # the only port published to the host
+    networks:
+      - front
+      - back
+    # Readiness: ready means Redis is reachable, not just that the process runs.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 2
+      start_period: 5s
+    restart: unless-stopped
+    mem_limit: 256m
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+    networks:
+      - back                 # no published port: reachable only by services on "back"
+    restart: unless-stopped
+    mem_limit: 128m
+
+networks:
+  front:
+  back:
+    internal: true           # containers on this network cannot reach the internet
+
+volumes:
+  redis-data:
